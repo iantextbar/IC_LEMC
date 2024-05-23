@@ -1,0 +1,134 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Calcula derivada
+def derivada_parcial(func, X, i, delta = 1e-7):
+    aux = []
+    for z, x in enumerate(X):
+        x_add = X[:z] + [x + delta] + X[z + 1:] #P/ cálculo da derivada "pela direita"
+        x_sub = X[:z] + [x - delta] + X[z + 1:] #P/ cálculo da derivada "pela esquerda"
+        # Calcula \partial f(.) / \partial x_i
+        deriv = (func(x_add, i) - func(x_sub, i)) / (2 *delta)
+        aux.append(deriv)
+    return aux
+
+# Implementa método de Newton
+def newton(funcao, x, c_lim = 1000, tol = 1e-10):
+    # Inicia contador
+    c = 0
+    # Inicia loop
+    while True:
+        # Atualiza contador
+        c += 1
+        # Salva o vetor x de valores para as variáveis da iteração anterior
+        x_prev = x[:]
+        # Cria um vetor F, que guardará os valores de cada uma das funções calculadas para o vetor X
+        F = []
+        # Cria uma lista J, que abrigará as derivadas parciais de todas as funções do vetor `funcao´
+        J = []
+        # Itera na lista de funções
+        for i, func in enumerate(funcao):
+            # Calcula o valor da função no ponto X e guarda na lista F
+            F.append( func(x, i) )
+            # Calcula as derivadas parciais da função no ponto X e guarda na lista J
+            J.append( derivada_parcial(func, x, i) )
+        # Invertemos a jacobiana J
+        Ji = np.linalg.inv(J)
+        # Premultiplicamos a inversa da Jacobiana pelo vetor F
+        FJ_dot = np.dot(Ji, F)
+        # Calculamos a diferença entre cada um dos valores dos vetores x_prev e FJ_dot
+        x = [X - FJ_dot[i] for i, X in enumerate(x_prev)]
+        # Guardamos a maior distância calculada
+        dist = max([abs(x_prev[i] - x[i]) for i in range(len(x))])
+        # Se a distância for menor do que a tolerância, o algoritmo termina e retorna x
+        if dist < tol:
+            return x
+        # Se o número de iterações ultrapassa o limite imposto, o código para sem devolver nada
+        elif c > c_lim:
+            break
+        # Se nenhuma das condições de parada for atendida, o código continua
+        
+##########################
+# Teste com duas firmas
+# Seta número de firmas
+n = 2
+# Cria função para calcular o preço
+p = lambda Q: 120 - sum(Q)
+# Cria função de melhor-resposta
+BR = lambda x, i: (90 - sum(x[:i] + x[i+1:]) ) / 2 - x[i]
+# Cria lista de funções de melhor-resposta
+lfunc = [BR] * n
+# Resolve o problema usando Newton
+newton(lfunc, [30] * n) # tô chutando como preço de equilíbrio o preço de eq. no mercado competitivo
+
+# Teste com múltiplas firmas
+p_path = []
+for n in range(1, 150):
+    # Atualiza número de firmas
+    n = n
+    print(f'Teste com {n} firmas')
+    # Recria lista com funções de melhor-resposta
+    lfunc = [BR] * n
+    # Calcula os resultados (quantidades produzidas por cada firma) usando Newton
+    res = newton(lfunc, [1] * n)
+    # Calcula o preço de mercado com base na produção total
+    p_c = p(res)
+    # Apensa o preço resultante em uma lista
+    p_path.append(p_c)
+    # Faz plots
+    if n % 20 == 0:
+        plt.plot(p_path, label = 'Preço do oligopólio')
+        plt.hlines(30, 0 + .5, n - .5, ls = ':', color = 'r',
+                   label =  'Preço do mercado em concorrência perfeita') #É só fazer P = CMg
+        plt.xlim(0 - .5, n + .5)
+        plt.xlabel('n. de firmas')
+        plt.ylabel('preço')
+        plt.legend()
+        plt.show()
+
+##########################
+# Uma vantagem bacana dessa forma de resolver é que conseguimos usar firmas com características (funções de custo) diferentes
+# Seta número de firmas dos tipos 1 e 2, respectivamente
+n1, n2 = 1, 1
+# Cria função para calcular o preço
+p = lambda Q: 120 - sum(Q)
+# Cria função de melhor-resposta para cada um dos tipos
+BR1 = lambda x, i: (90 - sum(x[:i] + x[i+1:]) ) / 2 - x[i]
+BR2 = lambda x, i: (120 - sum(x[:i] + x[i+1:]) ) / 2 - x[i] - 30 * x[i] ** 2
+# Cria lista de funções de melhor-resposta
+lfunc = [*[BR1] * n1, *[BR2] * n2]
+# Resolve o problema usando Newton
+newton(lfunc, [30] * (n1 + n2))
+
+
+# Teste com múltiplas firmas
+p_path = []
+y_path= [[], []]
+for n in range(2, 100, 2):
+    n1 = n2 = n // 2
+    print(f'Teste com {n//2} firmas de cada tipo')    
+    lfunc = [*[BR1] * n1, *[BR2] * n2]
+    # Calcula os resultados (quantidades produzidas por cada firma) usando Newton
+    res = newton(lfunc, [1] * (n1 + n2))
+    y_path[0].append(res[0])
+    y_path[1].append(res[-1])
+    # Calcula o preço de mercado com base na produção total
+    p_c = p(res)
+    # Apensa o preço resultante em uma lista
+    p_path.append(p_c)
+    # Faz plots
+    if n % 20 == 0:
+        plt.plot(p_path, label = 'Preço do oligopólio')
+        # plt.hlines(30, 0 + .5, n // 2 - .5, ls = ':', color = 'r',
+        #            label =  'Preço do mercado em concorrência perfeita') #=> esse preço vai mudar com duas firmas diferentes. tem que fazer as contas depois (´~´)
+        plt.xlim(0 - .5, n // 2 + .5)
+        plt.xlabel('n. de firmas')
+        plt.ylabel('preço')
+        plt.legend()
+        plt.show()
+        for i, vec in enumerate(y_path):
+            plt.plot(vec, label = f'Produção de cada firma do tipo {i + 1}')
+        plt.xlabel('n. de firmas de cada tipo')
+        plt.ylabel('produto da firma')
+        plt.legend()
+        plt.show()

@@ -1,0 +1,218 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Nov 16 18:36:02 2021
+
+@author: Ian
+
+Modelo Escolha Intertemporal 
+
+Objetivos: Criar funcoes que resolvam o problema da escolha
+intertemporal de consumo e poupanca, em uma economia com
+2 periodos, para diversas formas funcionais. Retornar o 
+consumo nos dois periodos e a poupanca otima no periodo 1. 
+
+"""
+# Importando Pacotes 
+
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+
+# Resolucao analitica para uma funcao utilidade
+# u(c) = ln(c)
+
+def escolha_intertemp_analitica(beta, dota1, dota2, juros):
+    
+    # Calculando a renda no periodo t
+    # e os monomios vindos da substituicao
+    # de ct+1 da equacao de Fisher na restricao
+    # orcamentaria
+    
+    renda_em_t = dota1 + dota2 / (1 + juros)
+    monomio1   = 1 / (1 + beta)
+    monomio2   = beta * (1 + juros)
+    
+    # Calculando consumo em t e t+1 
+    # e poupanca
+    
+    ct   = monomio1 * renda_em_t
+    ct_1 = monomio2 * ct
+    s    = dota1 - ct
+    
+    return ct, ct_1, s
+
+# Resolucao utilizando representacoes matriciais do 
+# sistema de equacoes e resolvendo por Leontief
+
+def escolha_intertemp_alglin(beta, dota1, dota2, juros):
+    
+    renda_em_t = dota1 + dota2 / (1 + juros)
+    fator_desc_intertemp = 1 / (1 + juros)
+    
+    # Vetor do resultado
+    res = np.array([[0],
+                    [renda_em_t]])
+    
+    
+    # Matriz de coeficientes
+    mat_coef = np.array([[beta, -fator_desc_intertemp],
+                         [1, fator_desc_intertemp]])
+    
+    # Matriz inversa de coeficientes
+    inv_mat_coef = np.linalg.inv(mat_coef)
+    
+    # Produto interno da matriz inversa com 
+    # o vetor de resultados
+    consumo = np.dot(inv_mat_coef, res)
+    
+    # Isolando os resultados
+    ct = consumo[0][0]
+    ct_1 = consumo[1][0]
+    s = dota1 - ct
+    
+    return ct, ct_1, s
+
+# Resolucao utilizando iteracao por um grid - "numerico forca bruta"
+
+def escolha_intertemp_num(func, beta, dota1, dota2, juros,
+                          grids, gride, gridtam = 1000, tol = 2):
+    
+    renda_em_t           = dota1 + dota2 / (1 + juros)
+    fator_desc_intertemp = 1 / (1 + juros)
+    
+    # Define o grid
+    ct_vec   = np.linspace(grids, gride, gridtam)
+    ct_1_vec = np.linspace(grids, gride, gridtam)
+    
+    # Define as variaveis de output
+    ct   = 0
+    ct_1 = 0
+    
+    # Para cada par ordenado no grid
+    for i in ct_vec:
+        for j in ct_1_vec:
+            
+            # Calcula o valor da equacao de fisher e da
+            # restricao orcamentaria
+            fisher = (beta * func(j)) / func(i) - fator_desc_intertemp
+            res_orc = i + (j * fator_desc_intertemp) - renda_em_t
+            
+            # Caso as igualdades na equacao de fisher
+            # e na restricao orcamentaria valham, preenche
+            # as variaveis de output com as respostas e quebra 
+            # o loop
+            if round(fisher, tol) == 0 and round(res_orc, tol) == 0:
+                ct   = i
+                ct_1 = j
+                break
+    
+    return ct, ct_1, dota1 - ct
+
+a, b, c = escolha_intertemp_analitica(beta = 0.8,
+                                      dota1 = 8,
+                                      dota2 = 11,
+                                      juros = 0.1)
+
+d, e, f = escolha_intertemp_alglin(beta = 0.8,
+                                   dota1 = 8,
+                                   dota2 = 11,
+                                   juros = 0.1)
+
+def d_ln(n):
+    return 1 / n
+
+def crra(n):
+    pass
+g, h, i = escolha_intertemp_num(func = d_ln,
+                                beta = 0.8,
+                                dota1 = 8,
+                                dota2 = 11,
+                                juros = 0.1,
+                                grids = 7,
+                                gride = 11)
+
+# Graficos
+
+# Grafico preferencias
+x = np.linspace(0.01, 11, 1000)
+pref = np.log(x) + 0.8 * np.log(x)
+
+# Fazer ct_1 como dependente de ct
+
+
+
+plt.plot(x, pref, c = 'red', label = '$\ln(c_t) + 0.8\ln(c_{t+1})$')
+plt.legend(loc = 'upper left')
+plt.ylim([0, 5])
+plt.title('Preferências do Consumidor', fontsize = 20)
+plt.xlabel('$c_t$', fontsize = 15)
+plt.ylabel('$c_{t+1}$', fontsize = 15)
+plt.show()
+
+# Grafico restricao orcamentaria
+res_orc = (2.1 * x)/1.1 - 18
+
+plt.plot(x, res_orc, c = 'green', label = '$c_t + {c_{t+1}}/{1.1} - 18 = 0$')
+plt.legend(loc = 'upper left')
+plt.title('Restrição Orcamentária do Consumidor', fontsize = 20)
+plt.xlabel('$c_t$', fontsize = 15)
+plt.ylabel('$c_{t+1}$', fontsize = 15)
+plt.show()
+
+# Grafico restricao e preferencias
+
+plt.plot(x, res_orc, c = 'green', label = '$c_t + {c_{t+1}}/{1.1} - 18 = 0$')
+plt.plot(x, pref, 'r+' , c = 'red', label = '$\ln(c_t) + 0.8\ln(c_{t+1})$')
+plt.plot(b, a,'go', c = 'black')
+plt.legend(loc = 'upper left')
+plt.title('Restrição Orcamentária e Preferências do Consumidor', fontsize = 20)
+plt.xlabel('$c_t$', fontsize = 15)
+plt.ylabel('$c_{t+1}$', fontsize = 15)
+plt.show()
+
+# Alteracoes de B e o impacto em ct, ct+1 e s
+
+ct_vec = []
+ct1_vec = []
+s_vec = []
+
+beta = np.linspace(0, 1, 100)
+
+for i in beta:
+    ct, ct1, s = escolha_intertemp_alglin(i, 8, 11, 0.1)
+    ct_vec.append(ct)
+    ct1_vec.append(ct1)
+    s_vec.append(s)
+    
+plt.plot(beta, s_vec, 'r^', label = 'Poupança')
+plt.plot(beta, ct_vec, ls = 'dashed', label = '$c_t$')
+plt.plot(beta, ct1_vec, c = 'green', label = '$c_{t+1}$')
+plt.title('Impactos de Alterações em Beta', fontsize = 20)
+plt.xlabel('Beta', fontsize = 15)
+plt.ylabel('$c_t, c_{t+1}, s$', fontsize = 15)
+plt.legend(loc = 'upper center', bbox_to_anchor = (1.25, 0.75))
+plt.show()
+
+# Alteracoes de juros e o impacto em ct, ct+1 e s
+
+ct_vec = []
+ct1_vec = []
+s_vec = []
+
+juros = np.linspace(0, 1, 100)
+
+for i in juros:
+    ct, ct1, s = escolha_intertemp_alglin(0.8, 8, 11, i)
+    ct_vec.append(ct)
+    ct1_vec.append(ct1)
+    s_vec.append(s)
+    
+plt.plot(juros, s_vec, 'r^', label = 'Poupança')
+plt.plot(juros, ct_vec, ls = 'dashed', label = '$c_t$')
+plt.plot(juros, ct1_vec, c = 'green', label = '$c_{t+1}$')
+plt.title('Impactos de Alterações nos Juros', fontsize = 20)
+plt.xlabel('Taxa de Juros', fontsize = 15)
+plt.ylabel('$c_t, c_{t+1}, s$', fontsize = 15)
+plt.legend(loc = 'upper center', bbox_to_anchor = (1.25, 0.75))
+plt.show()
